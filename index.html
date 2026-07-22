@@ -693,6 +693,20 @@
   .mxi-row .nm{font-weight:600;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
   .mxi-row .vl{font-weight:700;white-space:nowrap;}
   .mxi-row .ww{width:56px;text-align:right;font-weight:700;white-space:nowrap;font-size:12px;}
+
+  /* ===== メトリクス フィルタバー ===== */
+  .mx-filterbar{
+    display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+    background:var(--card-bg);border:1px solid var(--border);border-radius:14px;
+    padding:12px 14px;margin-bottom:16px;box-shadow:var(--shadow);
+  }
+  .mx-filterbar-label{font-size:11px;color:var(--text-sub);font-weight:600;}
+  .mx-filterbar select{
+    font-family:inherit;font-size:12.5px;font-weight:600;color:var(--text);
+    border:1px solid var(--border);border-radius:10px;padding:7px 10px;
+    background:#FAFAFA;cursor:pointer;
+  }
+  .mx-filterbar .gran-row{margin:0 0 0 4px;}
 </style>
 </head>
 <body>
@@ -805,6 +819,27 @@
   <section id="panel-metrics" class="panel">
     <h1 class="page-title">メトリクス</h1>
     <p style="font-size:13px;color:var(--text-sub);margin:-8px 0 16px;">週次は速報値です。確定値は月次でご報告します。</p>
+
+    <div class="mx-filterbar">
+      <span class="mx-filterbar-label">期間</span>
+      <select id="mxPeriodSel">
+        <option value="7d">直近7日</option>
+        <option value="14d">直近14日</option>
+        <option value="4w">直近4週</option>
+        <option value="thisMonth">今月</option>
+        <option value="lastMonth">先月</option>
+        <option value="all">全期間</option>
+      </select>
+      <span class="mx-filterbar-label">店舗</span>
+      <select id="mxStoreSel">
+        <option value="all">全店舗</option>
+      </select>
+      <div class="gran-row">
+        <button class="gran-btn active" data-g="daily">日別</button>
+        <button class="gran-btn" data-g="weekly">週別</button>
+        <button class="gran-btn" data-g="monthly">月別</button>
+      </div>
+    </div>
 
     <h2 class="section-title">セールス<span class="mx-q">売上は伸びているか?</span></h2>
     <div class="card" id="mxSalesCard"><div class="empty-note">読み込み中…</div></div>
@@ -1151,6 +1186,10 @@ function renderWeekly(){
 /* ===================== メトリクス ===================== */
 let MX_CHART = null;
 let MX_CUST_CHART = null;
+let MX_LABOR_CHART = null;
+let MX_I_CHARTS = {};
+let MX_FILTER = { period: "7d", store: "all", gran: "daily" };
+
 function fmtTs(ts){
   if(!ts) return null;
   const d = new Date(ts);
@@ -1166,18 +1205,18 @@ function mxUpdatedLabel(){
   const ts = fmtTs(mxMaxTs(DAILY)) || fmtTs(mxMaxTs(WEEKLY));
   return ts ? ("データ最終更新: " + ts) : "";
 }
-function mxLatestWeek(){
-  if(!WEEKLY || WEEKLY.length===0) return null;
-  const ws = [...new Set(WEEKLY.map(r=>r.week_start))].sort().reverse()[0];
-  return { ws, rows: WEEKLY.filter(r=>r.week_start===ws) };
-}
-function mxWeekDates(ws, we){
-  const out=[]; let d=new Date(ws+"T00:00:00Z"); const end=new Date(we+"T00:00:00Z");
-  while(d<=end){ out.push(d.toISOString().slice(0,10)); d=new Date(d.getTime()+86400000); }
-  return out;
-}
 function mxShiftDate(s, days){
   const d=new Date(s+"T00:00:00Z"); return new Date(d.getTime()+days*86400000).toISOString().slice(0,10);
+}
+function mxDaysCount(start, end){
+  const a=new Date(start+"T00:00:00Z"), b=new Date(end+"T00:00:00Z");
+  return Math.round((b-a)/86400000)+1;
+}
+function mxWeekMonday(dateStr){
+  const d = new Date(dateStr+"T00:00:00Z");
+  const dow = d.getUTCDay();
+  const diff = (dow===0) ? -6 : (1-dow);
+  return new Date(d.getTime()+diff*86400000).toISOString().slice(0,10);
 }
 function mxBar(label, value, max, color){
   const w = max>0 ? Math.max(2, Math.round(value/max*100)) : 0;
@@ -1185,93 +1224,321 @@ function mxBar(label, value, max, color){
     +'<div class="mx-bar-track"><div class="mx-bar-fill" style="width:'+w+'%;background:'+color+'"></div></div>'
     +'<div class="mx-bar-val">'+fmtYen(value)+'</div></div>';
 }
+function mxDs(label, data, color, fill){
+  return {label: label, data: data, borderColor: color,
+    backgroundColor: fill ? "rgba(0,113,227,0.06)" : "transparent",
+    fill: !!fill, tension: 0, pointRadius: 3, borderWidth: 2.2, spanGaps: true};
+}
+function mxWowPct(cur, prev){
+  if(cur===null||cur===undefined||prev===null||prev===undefined||Number(prev)===0) return null;
+  return (Number(cur)/Number(prev)-1)*100;
+}
+function mxLineChart(canvasId, emptyId, labels, datasets, yFmt, prev){
+  const cv = document.getElementById(canvasId);
+  const empty = emptyId ? document.getElementById(emptyId) : null;
+  if(!cv || typeof Chart === "undefined") return prev;
+  const has = datasets.some(ds => ds.data.some(v=>v!==null && v!==undefined));
+  if(!has){ cv.style.display="none"; if(empty) empty.style.display="block"; return prev; }
+  cv.style.display="block"; if(empty) empty.style.display="none";
+  if(prev){ prev.destroy(); }
+  return new Chart(cv, { type:"line",
+    data:{ labels: labels, datasets: datasets },
+    options:{ plugins:{legend:{display: datasets.length>1, position:"bottom", labels:{boxWidth:18, boxHeight:2, font:{size:11}}}},
+      scales:{ y:{ticks:{callback:yFmt}}, x:{ticks:{font:{size:11}, maxTicksLimit:10}} },
+      responsive:true, maintainAspectRatio:true } });
+}
+
+/* ---- グローバルフィルタ: 期間・店舗・粒度 ---- */
+function mxDailyMaxDate(){
+  if(!DAILY||DAILY.length===0) return null;
+  return DAILY.reduce((m,d)=> (!m||d.biz_date>m)?d.biz_date:m, null);
+}
+function mxDailyMinDate(){
+  if(!DAILY||DAILY.length===0) return null;
+  return DAILY.reduce((m,d)=> (!m||d.biz_date<m)?d.biz_date:m, null);
+}
+function mxPeriodBounds(period){
+  const end0 = mxDailyMaxDate();
+  if(!end0) return null;
+  let start, end=end0, hasPrev=true;
+  if(period==="7d"){ start = mxShiftDate(end,-6); }
+  else if(period==="14d"){ start = mxShiftDate(end,-13); }
+  else if(period==="4w"){ start = mxShiftDate(end,-27); }
+  else if(period==="thisMonth"){ start = end.slice(0,7)+"-01"; }
+  else if(period==="lastMonth"){
+    const firstOfThis = end.slice(0,7)+"-01";
+    const lastOfPrev = mxShiftDate(firstOfThis,-1);
+    start = lastOfPrev.slice(0,7)+"-01";
+    end = lastOfPrev;
+  } else { // "all"
+    start = mxDailyMinDate();
+    hasPrev = false;
+  }
+  let prevStart=null, prevEnd=null;
+  if(hasPrev){
+    const len = mxDaysCount(start,end);
+    prevEnd = mxShiftDate(start,-1);
+    prevStart = mxShiftDate(prevEnd,-(len-1));
+  }
+  return {start,end,prevStart,prevEnd,hasPrev};
+}
+function mxPeriodLabel(){
+  return {"7d":"直近7日","14d":"直近14日","4w":"直近4週","thisMonth":"今月","lastMonth":"先月","all":"全期間"}[MX_FILTER.period] || "";
+}
+function mxStoreList(){
+  const set = new Set();
+  (WEEKLY||[]).forEach(r=>{ if(r.store && r.store!=="全社合計") set.add(r.store); });
+  return [...set].sort((a,b)=>a.localeCompare(b,"ja"));
+}
+function mxFilterDaily(start, end, store){
+  return (DAILY||[]).filter(d=> d.biz_date>=start && d.biz_date<=end && (store==="all" || d.store===store));
+}
+function mxSum(rows, field){
+  return (rows||[]).reduce((s,x)=> s + (x[field]!==null && x[field]!==undefined ? Number(x[field]) : 0), 0);
+}
+function mxSumIf(rows, field){
+  let has=false, s=0;
+  (rows||[]).forEach(x=>{ if(x[field]!==null && x[field]!==undefined){ has=true; s+=Number(x[field]); } });
+  return has ? s : null;
+}
+function mxPeriodValue(rows, kind, fields){
+  if(kind==="ratio"){
+    let n=0,d=0;
+    (rows||[]).forEach(r=>{ if(r[fields[0]]!==null&&r[fields[0]]!==undefined&&r[fields[1]]!==null&&r[fields[1]]!==undefined){ n+=Number(r[fields[0]]); d+=Number(r[fields[1]]); } });
+    return d>0 ? n/d : null;
+  }
+  return mxSum(rows, fields[0]);
+}
+
+/* ---- 粒度バケット ---- */
+function mxBucketKey(dateStr, gran){
+  if(gran==="weekly") return mxWeekMonday(dateStr);
+  if(gran==="monthly") return dateStr.slice(0,7);
+  return dateStr;
+}
+function mxBucketLabel(key, gran){
+  const fmtD = s=>{const p=String(s).split("-");return Number(p[1])+"/"+Number(p[2]);};
+  if(gran==="weekly"){ return fmtD(key)+"〜"+fmtD(mxShiftDate(key,6))+"週"; }
+  if(gran==="monthly"){ return key.replace("-","/"); }
+  const wd=["日","月","火","水","木","金","土"];
+  const d = new Date(key+"T00:00:00Z");
+  return fmtD(key)+"("+wd[d.getUTCDay()]+")";
+}
+function mxBucketize(rows, gran, fields){
+  const map = {};
+  (rows||[]).forEach(r=>{
+    const k = mxBucketKey(r.biz_date, gran);
+    if(!map[k]) map[k] = {};
+    fields.forEach(f=>{
+      const v = r[f];
+      if(v!==null && v!==undefined){ map[k][f] = (map[k][f]||0) + Number(v); }
+    });
+  });
+  return Object.keys(map).sort().map(k=>({ key:k, label: mxBucketLabel(k,gran), vals: map[k] }));
+}
+function mxBucketSum(rows, gran, field){
+  return mxBucketize(rows, gran, [field]).map(x=>({key:x.key, label:x.label, value: x.vals[field]!==undefined?x.vals[field]:null}));
+}
+function mxBucketRatio(rows, gran, numField, denField){
+  const map = {};
+  (rows||[]).forEach(r=>{
+    const k = mxBucketKey(r.biz_date, gran);
+    if(!map[k]) map[k] = {n:0,d:0};
+    if(r[numField]!==null && r[numField]!==undefined && r[denField]!==null && r[denField]!==undefined){
+      map[k].n += Number(r[numField]); map[k].d += Number(r[denField]);
+    }
+  });
+  return Object.keys(map).sort().map(k=>({key:k, label:mxBucketLabel(k,gran), value: map[k].d>0 ? map[k].n/map[k].d : null}));
+}
+function mxTwoLineSeries(curRows, prevRows, gran, field, hasPrev){
+  const cur = mxBucketSum(curRows, gran, field);
+  const labels = cur.map(b=>b.label);
+  const curData = cur.map(b=>b.value);
+  let prevData = null;
+  if(hasPrev){
+    const prev = mxBucketSum(prevRows, gran, field);
+    prevData = labels.map((_,i)=> prev[i] ? prev[i].value : null);
+  }
+  return {labels, curData, prevData};
+}
+function mxIndicatorChartSeries(curRows, prevRows, gran, kind, fields, hasPrev){
+  const curB = kind==="ratio" ? mxBucketRatio(curRows,gran,fields[0],fields[1]) : mxBucketSum(curRows,gran,fields[0]);
+  const labels = curB.map(b=>b.label);
+  const curData = curB.map(b=>b.value);
+  let prevData = null;
+  if(hasPrev){
+    const prevB = kind==="ratio" ? mxBucketRatio(prevRows,gran,fields[0],fields[1]) : mxBucketSum(prevRows,gran,fields[0]);
+    prevData = labels.map((_,i)=> prevB[i] ? prevB[i].value : null);
+  }
+  return {labels, curData, prevData};
+}
+function mxIndicatorStoreRows(curRows, prevRows, kind, fields, hasPrev){
+  return mxStoreList().map(s=>{
+    const v = mxPeriodValue(curRows.filter(d=>d.store===s), kind, fields);
+    const pv = hasPrev ? mxPeriodValue(prevRows.filter(d=>d.store===s), kind, fields) : null;
+    return { name:s, value:v, wow: mxWowPct(v,pv) };
+  }).sort((a,b)=>(b.value||0)-(a.value||0));
+}
+
+/* ---- フィルタバー配線 ---- */
+function mxPopulateStoreSelect(){
+  const sel = document.getElementById("mxStoreSel");
+  if(!sel || sel.dataset.populated==="1") return;
+  mxStoreList().forEach(s=>{
+    const opt = document.createElement("option");
+    opt.value = s; opt.textContent = s;
+    sel.appendChild(opt);
+  });
+  sel.dataset.populated = "1";
+}
+function mxRenderAll(){
+  renderMetrics();
+  renderIndicators();
+  renderPeople();
+  renderTargets();
+  renderVoice();
+  renderMetricsCharts();
+}
+function mxWireFilterBar(){
+  mxPopulateStoreSelect();
+  const psel = document.getElementById("mxPeriodSel");
+  const ssel = document.getElementById("mxStoreSel");
+  if(psel){ psel.value = MX_FILTER.period; psel.onchange = ()=>{ MX_FILTER.period = psel.value; mxRenderAll(); }; }
+  if(ssel){ ssel.value = MX_FILTER.store; ssel.onchange = ()=>{ MX_FILTER.store = ssel.value; mxRenderAll(); }; }
+}
+function wireGranButtons(){
+  mxWireFilterBar();
+  document.querySelectorAll(".gran-btn").forEach(b=>{
+    b.classList.toggle("active", b.dataset.g===MX_FILTER.gran);
+    b.onclick = ()=>{
+      MX_FILTER.gran = b.dataset.g;
+      document.querySelectorAll(".gran-btn").forEach(x=>x.classList.toggle("active", x.dataset.g===MX_FILTER.gran));
+      renderMetricsCharts();
+    };
+  });
+}
+
+/* ---- セールス・お客さま(客数) ---- */
 function renderMetrics(){
   const sales = document.getElementById("mxSalesCard");
   const cust = document.getElementById("mxCustomerCard");
   if(!sales) return;
-  const lw = mxLatestWeek();
+  mxWireFilterBar();
   const updated = mxUpdatedLabel();
   const wUpd = document.getElementById("weeklyUpdatedNote");
   if(wUpd){ const t = fmtTs(mxMaxTs(WEEKLY)); wUpd.textContent = t ? ("データ最終更新: " + t) : ""; }
-  if(!lw){
+
+  const pb = mxPeriodBounds(MX_FILTER.period);
+  if(!pb){
     sales.innerHTML = '<div class="empty-note">データ準備中です。</div>';
     if(cust) cust.innerHTML = '<div class="empty-note">データ準備中です。</div>';
     return;
   }
-  const TOTAL_LABEL = "全社合計";
-  const total = lw.rows.find(r=>r.store===TOTAL_LABEL) || {};
-  const stores = lw.rows.filter(r=>r.store!==TOTAL_LABEL).sort((a,b)=>(Number(b.total_sales)||0)-(Number(a.total_sales)||0));
+  const store = MX_FILTER.store;
+  const curRows = mxFilterDaily(pb.start, pb.end, store);
+  const prevRows = pb.hasPrev ? mxFilterDaily(pb.prevStart, pb.prevEnd, store) : [];
   const fmtD = s=>{const p=String(s).split("-");return Number(p[1])+"/"+Number(p[2]);};
-  const we = lw.rows[0].week_end;
-  const wow = (total.wow_pct===null||total.wow_pct===undefined)?null:Number(total.wow_pct);
-  let lunch=0, dinner=0, hasLD=false;
-  DAILY.forEach(d=>{
-    if(d.biz_date>=lw.ws && d.biz_date<=we){
-      if(d.lunch_sales!==null && d.lunch_sales!==undefined){ lunch+=Number(d.lunch_sales); hasLD=true; }
-      if(d.dinner_sales!==null && d.dinner_sales!==undefined){ dinner+=Number(d.dinner_sales); }
-    }
-  });
-  const inStore=Number(total.in_store_sales)||0, dlv=Number(total.delivery_sales)||0, to=Number(total.takeout_sales)||0;
-  const mx = Math.max(inStore,dlv,to,lunch,dinner,1);
+  const periodRange = fmtD(pb.start)+"〜"+fmtD(pb.end);
+
+  const totalSales = mxSum(curRows,"total_sales");
+  const prevTotalSales = pb.hasPrev ? mxSum(prevRows,"total_sales") : null;
+  const wow = pb.hasPrev ? mxWowPct(totalSales, prevTotalSales) : null;
+
+  const lunch = mxSumIf(curRows,"lunch_sales");
+  const dinner = mxSumIf(curRows,"dinner_sales");
+  const hasLD = lunch!==null;
+  const inStore = mxSum(curRows,"in_store_sales");
+  const dlv = mxSum(curRows,"delivery_sales");
+  const to = mxSum(curRows,"takeout_sales");
+  const barMax = Math.max(inStore,dlv,to,lunch||0,dinner||0,1);
   const bars = hasLD
-    ? mxBar("店内ランチ",lunch,mx,"#0071E3")+mxBar("店内ディナー",dinner,mx,"#5AA9F0")+mxBar("デリバリー",dlv,mx,"#1D9A56")+mxBar("テイクアウト",to,mx,"#BF7C00")
-    : mxBar("店内",inStore,mx,"#0071E3")+mxBar("デリバリー",dlv,mx,"#1D9A56")+mxBar("テイクアウト",to,mx,"#BF7C00")
+    ? mxBar("店内ランチ",lunch,barMax,"#0071E3")+mxBar("店内ディナー",dinner||0,barMax,"#5AA9F0")+mxBar("デリバリー",dlv,barMax,"#1D9A56")+mxBar("テイクアウト",to,barMax,"#BF7C00")
+    : mxBar("店内",inStore,barMax,"#0071E3")+mxBar("デリバリー",dlv,barMax,"#1D9A56")+mxBar("テイクアウト",to,barMax,"#BF7C00")
       +'<div class="mx-note" style="margin-top:6px;">ランチ/ディナー分解は日次データの反映後に表示されます</div>';
+
+  let rankOrBreakdown;
+  if(store==="all"){
+    const rows = mxStoreList().map(s=>{
+      const v = mxSum(curRows.filter(d=>d.store===s),"total_sales");
+      const pv = pb.hasPrev ? mxSum(prevRows.filter(d=>d.store===s),"total_sales") : null;
+      return { name:s, value:v, wow: mxWowPct(v,pv) };
+    }).sort((a,b)=>b.value-a.value);
+    rankOrBreakdown = '<div class="mx-rank-title">■ 店舗別売上(対象期間・前期間比)</div>'
+      +'<div class="kpi-scroll"><table class="kpi-table"><thead><tr><th>店舗</th><th>売上</th>'+(pb.hasPrev?'<th>前期間比</th>':'')+'</tr></thead><tbody>'
+      + rows.map((r,i)=> '<tr><td class="kpi-store">'+(i+1)+'. '+escapeHtml(r.name)+'</td><td>'+fmtYen(r.value)+'</td>'
+          +(pb.hasPrev?'<td class="'+(r.wow===null?'':(r.wow<0?'wow-neg':'wow-pos'))+'">'+fmtPct(r.wow)+'</td>':'') +'</tr>').join("")
+      +'</tbody></table></div>';
+  } else {
+    const parts = hasLD
+      ? [["店内ランチ",lunch],["店内ディナー",dinner||0],["デリバリー",dlv],["テイクアウト",to]]
+      : [["店内",inStore],["デリバリー",dlv],["テイクアウト",to]];
+    const sumAll = parts.reduce((s,x)=>s+x[1],0) || 1;
+    rankOrBreakdown = '<div class="mx-rank-title">■ チャネル別内訳('+escapeHtml(store)+'・対象期間)</div>'
+      +'<div class="kpi-scroll"><table class="kpi-table"><thead><tr><th>区分</th><th>売上</th><th>構成比</th></tr></thead><tbody>'
+      + parts.map(r=>'<tr><td class="kpi-store">'+r[0]+'</td><td>'+fmtYen(r[1])+'</td><td>'+(r[1]/sumAll*100).toFixed(0)+'%</td></tr>').join("")
+      +'</tbody></table></div>';
+  }
+
   sales.innerHTML =
     '<div class="mx-updated">'+updated+'</div>'
-    +'<div class="mx-head"><div><div class="mx-kicker">週間総売上('+fmtD(lw.ws)+'〜'+fmtD(we)+'・速報値)</div>'
-    +'<div class="mx-big">'+fmtYen(total.total_sales===undefined?null:Number(total.total_sales))+'</div>'
-    +'<div class="mx-wow '+(wow===null?"":(wow<0?"wow-neg":"wow-pos"))+'">'+(wow===null?"":(wow<0?"▼ ":"▲ ")+fmtPct(wow)+" 前週比")+'</div></div>'
+    +'<div class="mx-head"><div><div class="mx-kicker">'+mxPeriodLabel()+'の総売上('+periodRange+(store==="all"?'':'・'+escapeHtml(store))+')</div>'
+    +'<div class="mx-big">'+fmtYen(totalSales)+'</div>'
+    +(pb.hasPrev ? '<div class="mx-wow '+(wow===null?"":(wow<0?"wow-neg":"wow-pos"))+'">'+(wow===null?"":(wow<0?"▼ ":"▲ ")+fmtPct(wow)+" 前期間比")+'</div>' : '')
+    +'</div>'
     +'<div class="mx-bars">'+bars+'</div></div>'
-    +'<div class="gran-row"><button class="gran-btn active" data-g="daily">日別</button><button class="gran-btn" data-g="weekly">週別</button><button class="gran-btn" data-g="monthly">月別</button></div><div class="mx-chart-wrap"><div class="mx-chart-title" id="mxSalesChartTitle">日次売上(今週 vs 前週)</div><canvas id="mxTrendChart" height="110"></canvas><div id="mxTrendEmpty" class="mx-note" style="display:none;">日次トレンドは本日のデータ更新後に表示されます</div></div>'
-    +'<div class="mx-rank-title">■ 店舗別売上(対象週・前週比)</div>'
-    +'<div class="kpi-scroll"><table class="kpi-table"><thead><tr><th>店舗</th><th>売上</th><th>前週比</th></tr></thead><tbody>'
-    + stores.map((r,i)=>{
-        const w2=(r.wow_pct===null||r.wow_pct===undefined)?null:Number(r.wow_pct);
-        return '<tr><td class="kpi-store">'+(i+1)+'. '+escapeHtml(r.store)+'</td><td>'+fmtYen(Number(r.total_sales))+'</td><td class="'+(w2===null?'':(w2<0?'wow-neg':'wow-pos'))+'">'+fmtPct(w2)+'</td></tr>';
-      }).join("")
-    +'</tbody></table></div>';
+    +'<div class="mx-chart-wrap"><div class="mx-chart-title" id="mxSalesChartTitle"></div><canvas id="mxTrendChart" height="110"></canvas><div id="mxTrendEmpty" class="mx-note" style="display:none;">選択期間のデータがありません</div></div>'
+    + rankOrBreakdown;
 
-  const weekDaily = DAILY.filter(d=> d.biz_date>=lw.ws && d.biz_date<=we);
-  const sum=(arr,k)=>arr.reduce((s,x)=>s+(Number(x[k])||0),0);
-  const custRows = stores.map(r=>{
-    const sd = weekDaily.filter(d=>d.store===r.store);
-    const toC=sum(sd,"takeout_count"), dlvC=sum(sd,"delivery_count");
-    const plaus = u => (u && u>=300 && u<=10000) ? u : null;
-    const toU = plaus(toC>0 ? sum(sd,"takeout_sales")/toC : null);
-    const dlvU = plaus(dlvC>0 ? sum(sd,"delivery_sales")/dlvC : null);
-    return '<tr><td class="kpi-store">'+escapeHtml(r.store)+'</td>'
-      +'<td>'+(r.customers?Math.round(Number(r.customers)).toLocaleString("ja-JP"):"–")+'</td>'
-      +'<td>'+(r.avg_check?fmtYen(Number(r.avg_check)):"–")+'</td>'
-      +'<td>'+(dlvU?fmtYen(dlvU):"–")+'</td><td>'+(toU?fmtYen(toU):"–")+'</td></tr>';
-  }).join("");
   if(cust){
+    const custStores = store==="all" ? mxStoreList() : [store];
+    const custRows = custStores.map(s=>{
+      const sd = curRows.filter(d=>d.store===s);
+      const custN = mxSum(sd,"in_store_count");
+      const inStoreS = mxSum(sd,"in_store_sales");
+      const avgCheck = custN>0 ? inStoreS/custN : null;
+      const toC=mxSum(sd,"takeout_count"), dlvC=mxSum(sd,"delivery_count");
+      const plaus = u => (u && u>=300 && u<=10000) ? u : null;
+      const toU = plaus(toC>0 ? mxSum(sd,"takeout_sales")/toC : null);
+      const dlvU = plaus(dlvC>0 ? mxSum(sd,"delivery_sales")/dlvC : null);
+      return {store:s, custN, avgCheck, dlvU, toU};
+    });
+    const custTotal = mxSum(curRows,"in_store_count");
     cust.innerHTML =
       '<div class="mx-updated">'+updated+'</div>'
-      +'<div class="mx-head"><div><div class="mx-kicker">週間客数(店内・速報値)</div>'
-      +'<div class="mx-big">'+(total.customers?Math.round(Number(total.customers)).toLocaleString("ja-JP"):"–")+'<span style="font-size:16px;font-weight:600;"> 人</span></div></div></div>'
-      +'<div class="mx-chart-wrap"><div class="mx-chart-title" id="mxCustChartTitle">日次客数・店内(今週 vs 前週)</div><canvas id="mxCustChart" height="110"></canvas><div id="mxCustEmpty" class="mx-note" style="display:none;">日次トレンドは本日のデータ更新後に表示されます</div></div>'
-      +'<div class="kpi-scroll"><table class="kpi-table"><thead><tr><th>店舗</th><th>客数</th><th>店内客単価</th><th>デリバリー件単価</th><th>TO件単価</th></tr></thead><tbody>'+custRows+'</tbody></table></div>'
+      +'<div class="mx-head"><div><div class="mx-kicker">'+mxPeriodLabel()+'の客数(店内'+(store==="all"?'':'・'+escapeHtml(store))+')</div>'
+      +'<div class="mx-big">'+(custTotal?Math.round(custTotal).toLocaleString("ja-JP"):"–")+'<span style="font-size:16px;font-weight:600;"> 人</span></div></div></div>'
+      +'<div class="mx-chart-wrap"><div class="mx-chart-title" id="mxCustChartTitle"></div><canvas id="mxCustChart" height="110"></canvas><div id="mxCustEmpty" class="mx-note" style="display:none;">選択期間のデータがありません</div></div>'
+      +'<div class="kpi-scroll"><table class="kpi-table"><thead><tr><th>店舗</th><th>客数</th><th>店内客単価</th><th>デリバリー件単価</th><th>TO件単価</th></tr></thead><tbody>'
+      + custRows.map(r=>'<tr><td class="kpi-store">'+escapeHtml(r.store)+'</td>'
+          +'<td>'+(r.custN?Math.round(r.custN).toLocaleString("ja-JP"):"–")+'</td>'
+          +'<td>'+(r.avgCheck?fmtYen(r.avgCheck):"–")+'</td>'
+          +'<td>'+(r.dlvU?fmtYen(r.dlvU):"–")+'</td><td>'+(r.toU?fmtYen(r.toU):"–")+'</td></tr>').join("")
+      +'</tbody></table></div>'
       +'<div class="mx-note">まぜそば ちゅるるは店内客数が日報未入力のため客数・客単価を表示できません(店舗へ入力を依頼中)。件単価は日次データの反映後に表示されます。件数入力に不整合がある場合(入力ミス疑い)は件単価を表示しません。</div>';
   }
 }
+
+/* ---- お客さまの声(店舗フィルタのみ適用) ---- */
 function renderVoice(){
   const box = document.getElementById("mxVoiceCard");
   if(!box) return;
-  const ts = fmtTs(mxMaxTs(REVIEW_ITEMS)) || fmtTs(mxMaxTs(REVIEWS));
-  const scoreStrip = (!REVIEWS || REVIEWS.length===0) ? "" :
-    '<div class="vc-strip">' + [...REVIEWS].sort((a,b)=>(a.sort_order||99)-(b.sort_order||99)).map(r=>{
+  const store = MX_FILTER.store;
+  const reviews = store==="all" ? (REVIEWS||[]) : (REVIEWS||[]).filter(r=>r.store===store);
+  const items = store==="all" ? (REVIEW_ITEMS||[]) : (REVIEW_ITEMS||[]).filter(r=>r.store===store);
+  const ts = fmtTs(mxMaxTs(items)) || fmtTs(mxMaxTs(reviews));
+  const scoreStrip = (!reviews || reviews.length===0) ? "" :
+    '<div class="vc-strip">' + [...reviews].sort((a,b)=>(a.sort_order||99)-(b.sort_order||99)).map(r=>{
       const sc = (r.tabelog_rating!==null && r.tabelog_rating!==undefined) ? Number(r.tabelog_rating).toFixed(2) : "–";
       return '<a class="vc-chip" href="' + (r.tabelog_url || r.google_url) + '" target="_blank" rel="noopener">'
         + '<span class="vc-chip-name">' + escapeHtml(r.store) + '</span>'
         + '<span class="vc-chip-score">' + sc + '</span></a>';
     }).join("") + '</div>';
   let list = '';
-  if(!REVIEW_ITEMS || REVIEW_ITEMS.length===0){
-    list = '<div class="mx-note">口コミデータを準備中です。</div>';
+  if(!items || items.length===0){
+    list = '<div class="mx-note">'+(store==="all"?"口コミデータを準備中です。":"該当店舗の口コミデータはまだありません。")+'</div>';
   }else{
-    const items = [...REVIEW_ITEMS].sort((a,b)=> a.review_month < b.review_month ? 1 : a.review_month > b.review_month ? -1 : 0);
-    list = '<div class="vc-list">' + items.map(it=>{
+    const sorted = [...items].sort((a,b)=> a.review_month < b.review_month ? 1 : a.review_month > b.review_month ? -1 : 0);
+    list = '<div class="vc-list">' + sorted.map(it=>{
       const m = String(it.review_month).slice(0,7).replace("-","/");
       const src = it.source === "google" ? '<span class="vc-src-badge vc-src-g">Google</span>' : '<span class="vc-src-badge vc-src-t">食べログ</span>';
       const star = (it.rating!==null && it.rating!==undefined) ? '<span class="vc-item-star">★' + Number(it.rating).toFixed(1) + '</span>' : '';
@@ -1284,86 +1551,54 @@ function renderVoice(){
   }
   box.innerHTML = '<div class="mx-updated">' + (ts ? "口コミ最終更新: " + ts : "") + '</div>'
     + scoreStrip
-    + '<div class="mx-chart-title" style="margin-top:12px;">最新の口コミ(食べログ・Google統合/新しい順)</div>'
+    + '<div class="mx-chart-title" style="margin-top:12px;">最新の口コミ(食べログ・Google統合/新しい順'+(store==="all"?"":"・"+escapeHtml(store))+')</div>'
     + list
     + '<div class="mx-note">口コミは要旨での掲載です(原文は各リンク先)。Googleの口コミはPlaces API連携の準備が整い次第この一覧に統合されます。食べログの評価点は各店チップに表示(取得時点)。閉店した水道橋店は対象外です。</div>';
 }
-let MX_GRAN = "daily";
-let MX_LABOR_CHART = null;
-function wireGranButtons(){
-  document.querySelectorAll(".gran-btn").forEach(b=>{
-    b.onclick = ()=>{
-      MX_GRAN = b.dataset.g;
-      document.querySelectorAll(".gran-btn").forEach(x=>x.classList.toggle("active", x.dataset.g===MX_GRAN));
-      renderMetricsCharts();
-    };
-  });
-}
-function mxLineChart(canvasId, emptyId, labels, datasets, yFmt, prev){
-  const cv = document.getElementById(canvasId);
-  const empty = emptyId ? document.getElementById(emptyId) : null;
-  if(!cv || typeof Chart === "undefined") return prev;
-  const has = datasets.some(ds => ds.data.some(v=>v!==null && v!==undefined));
-  if(!has){ cv.style.display="none"; if(empty) empty.style.display="block"; return prev; }
-  cv.style.display="block"; if(empty) empty.style.display="none";
-  if(prev){ prev.destroy(); }
-  return new Chart(cv, { type:"line",
-    data:{ labels: labels, datasets: datasets },
-    options:{ plugins:{legend:{display:true, position:"bottom", labels:{boxWidth:18, boxHeight:2, font:{size:11}}}},
-      scales:{ y:{ticks:{callback:yFmt}}, x:{ticks:{font:{size:11}, maxTicksLimit:10}} },
-      responsive:true, maintainAspectRatio:true } });
-}
-function mxDs(label, data, color, fill){
-  return {label: label, data: data, borderColor: color,
-    backgroundColor: fill ? "rgba(0,113,227,0.06)" : "transparent",
-    fill: !!fill, tension: 0, pointRadius: 3, borderWidth: 2.2, spanGaps: true};
-}
+
+/* ---- チャート描画(セールス・お客さま・主要指標・ピープル) ---- */
 function renderMetricsCharts(){
-  const lw = mxLatestWeek(); if(!lw) return;
+  const pb = mxPeriodBounds(MX_FILTER.period);
+  if(!pb) return;
+  const store = MX_FILTER.store, gran = MX_FILTER.gran;
+  const curRows = mxFilterDaily(pb.start, pb.end, store);
+  const prevRows = pb.hasPrev ? mxFilterDaily(pb.prevStart, pb.prevEnd, store) : [];
   const yen = v=>"¥"+(v/10000).toFixed(0)+"万";
-  const dm = {};
-  DAILY.forEach(d=>{ const k=d.biz_date; if(!dm[k]) dm[k]={s:null,c:null};
-    if(d.total_sales!==null && d.total_sales!==undefined){ dm[k].s=(dm[k].s||0)+Number(d.total_sales); }
-    if(d.in_store_count!==null && d.in_store_count!==undefined){ dm[k].c=(dm[k].c||0)+Number(d.in_store_count); } });
+  const granLabel = gran==="daily" ? "日次" : gran==="weekly" ? "週次" : "月次";
   const st = document.getElementById("mxSalesChartTitle"), ct = document.getElementById("mxCustChartTitle");
-  if(MX_GRAN==="daily"){
-    const we = lw.rows[0].week_end;
-    const cur = mxWeekDates(lw.ws, we), prev = cur.map(x=>mxShiftDate(x,-7));
-    const wd=["日","月","火","水","木","金","土"];
-    const labels = cur.map(x=>{const p=x.split("-");const d=new Date(x+"T00:00:00Z");return Number(p[1])+"/"+Number(p[2])+"("+wd[d.getUTCDay()]+")";});
-    const g=(arr,k)=>arr.map(x=> dm[x]?dm[x][k]:null);
-    if(st) st.textContent="日次売上(今週 vs 前週)";
-    if(ct) ct.textContent="日次客数・店内(今週 vs 前週)";
-    MX_CHART = mxLineChart("mxTrendChart","mxTrendEmpty",labels,[mxDs("今週",g(cur,"s"),"#0071E3",true),mxDs("前週",g(prev,"s"),"#B8C0CC")],yen,MX_CHART);
-    MX_CUST_CHART = mxLineChart("mxCustChart","mxCustEmpty",labels,[mxDs("今週",g(cur,"c"),"#0071E3",true),mxDs("前週",g(prev,"c"),"#B8C0CC")],v=>v+"人",MX_CUST_CHART);
-  } else if(MX_GRAN==="weekly"){
-    const totals = WEEKLY.filter(r=>r.store==="全社合計").sort((a,b)=> a.week_start<b.week_start?-1:1);
-    const fmtD = s=>{const p=String(s).split("-");return Number(p[1])+"/"+Number(p[2]);};
-    const labels = totals.map(r=>fmtD(r.week_start)+"〜"+fmtD(r.week_end));
-    if(st) st.textContent="週次売上(全社)";
-    if(ct) ct.textContent="週次客数・店内(全社)";
-    MX_CHART = mxLineChart("mxTrendChart","mxTrendEmpty",labels,[mxDs("週間総売上",totals.map(r=>r.total_sales===null?null:Number(r.total_sales)),"#0071E3",true)],yen,MX_CHART);
-    MX_CUST_CHART = mxLineChart("mxCustChart","mxCustEmpty",labels,[mxDs("週間客数",totals.map(r=>r.customers===null?null:Number(r.customers)),"#0071E3",true)],v=>v+"人",MX_CUST_CHART);
-  } else {
-    const mm = {};
-    Object.keys(dm).sort().forEach(k=>{ const m=k.slice(0,7); if(!mm[m]) mm[m]={s:0,c:0}; mm[m].s+=(dm[k].s||0); mm[m].c+=(dm[k].c||0); });
-    const months = Object.keys(mm).sort();
-    const labels = months.map(m=>m.replace("-","/"));
-    if(st) st.textContent="月次売上(全社・日報ベース/当月は累計中)";
-    if(ct) ct.textContent="月次客数・店内(全社)";
-    MX_CHART = mxLineChart("mxTrendChart","mxTrendEmpty",labels,[mxDs("月間総売上",months.map(m=>mm[m].s),"#0071E3",true)],yen,MX_CHART);
-    MX_CUST_CHART = mxLineChart("mxCustChart","mxCustEmpty",labels,[mxDs("月間客数",months.map(m=>mm[m].c),"#0071E3",true)],v=>v+"人",MX_CUST_CHART);
-  }
+
+  const salesSeries = mxTwoLineSeries(curRows, prevRows, gran, "total_sales", pb.hasPrev);
+  if(st) st.textContent = granLabel+"売上"+(pb.hasPrev?"(今期間 vs 前期間)":"(選択期間)");
+  const salesDatasets = pb.hasPrev
+    ? [mxDs("今期間", salesSeries.curData, "#0071E3", true), mxDs("前期間", salesSeries.prevData, "#B8C0CC")]
+    : [mxDs("売上", salesSeries.curData, "#0071E3", true)];
+  MX_CHART = mxLineChart("mxTrendChart","mxTrendEmpty", salesSeries.labels, salesDatasets, yen, MX_CHART);
+
+  const custSeries = mxTwoLineSeries(curRows, prevRows, gran, "in_store_count", pb.hasPrev);
+  if(ct) ct.textContent = granLabel+"客数・店内"+(pb.hasPrev?"(今期間 vs 前期間)":"(選択期間)");
+  const custDatasets = pb.hasPrev
+    ? [mxDs("今期間", custSeries.curData, "#0071E3", true), mxDs("前期間", custSeries.prevData, "#B8C0CC")]
+    : [mxDs("客数", custSeries.curData, "#0071E3", true)];
+  MX_CUST_CHART = mxLineChart("mxCustChart","mxCustEmpty", custSeries.labels, custDatasets, v=>v+"人", MX_CUST_CHART);
+
+  renderIndicatorCharts();
   renderLaborChart();
 }
+
+/* ---- ピープル(週次データのため週別固定) ---- */
 function renderLaborChart(){
   if(!LABOR || LABOR.length===0) return;
-  const weeks = [...new Set(LABOR.map(r=>r.week_start))].sort();
+  const pb = mxPeriodBounds(MX_FILTER.period);
+  const store = MX_FILTER.store;
+  let rows = LABOR.filter(r=> store==="all" || r.store===store);
+  if(pb) rows = rows.filter(r=> r.week_start>=pb.start && r.week_start<=pb.end);
+  if(rows.length===0) return;
+  const weeks = [...new Set(rows.map(r=>r.week_start))].sort();
   const fmtD = s=>{const p=String(s).split("-");return Number(p[1])+"/"+Number(p[2]);};
-  const stores = [...new Set(LABOR.map(r=>r.store))];
+  const stores = store==="all" ? [...new Set(rows.map(r=>r.store))] : [store];
   const colors = {"麺や天鳳 方南町店":"#0071E3","つけ麺 すする":"#1D9A56","まぜそば ちゅるる":"#E8590C","本格餃子 包 池尻大橋店":"#7C3AED","本格餃子 包 駒沢パーククォーター店":"#B47509","本格餃子 包 水道橋店":"#8E8E93"};
   const datasets = stores.map(s=>{
-    const data = weeks.map(w=>{ const r=LABOR.find(x=>x.week_start===w&&x.store===s); return (r&&r.sales_per_hour_reported!==null&&r.sales_per_hour_reported!==undefined)?Number(r.sales_per_hour_reported):null; });
+    const data = weeks.map(w=>{ const r=rows.find(x=>x.week_start===w&&x.store===s); return (r&&r.sales_per_hour_reported!==null&&r.sales_per_hour_reported!==undefined)?Number(r.sales_per_hour_reported):null; });
     return mxDs(s, data, colors[s]||"#555");
   });
   MX_LABOR_CHART = mxLineChart("mxLaborChart", null, weeks.map(w=>fmtD(w)+"週"), datasets, v=>"¥"+Number(v).toLocaleString("ja-JP"), MX_LABOR_CHART);
@@ -1372,19 +1607,29 @@ function renderPeople(){
   const box = document.getElementById("mxPeopleCard");
   if(!box) return;
   if(!LABOR || LABOR.length===0){ box.innerHTML='<div class="mx-note">労働時間データを準備中です(店長週次フォームより取得)。</div>'; return; }
-  const ws = [...new Set(LABOR.map(r=>r.week_start))].sort().reverse()[0];
-  const rows = LABOR.filter(r=>r.week_start===ws);
-  const we = mxShiftDate(ws, 6);
+  const pb = mxPeriodBounds(MX_FILTER.period);
+  const store = MX_FILTER.store;
+  let rows = LABOR.filter(r=> store==="all" || r.store===store);
+  if(pb) rows = rows.filter(r=> r.week_start>=pb.start && r.week_start<=pb.end);
+  const noteBase = '労働時間は週次データのため週別表示です(粒度切替は対象外)。';
+  if(rows.length===0){
+    box.innerHTML = '<div class="mx-note">選択した期間・店舗に該当する労働時間データがありません。</div>'
+      + '<div class="mx-note" style="margin-top:6px;">'+noteBase+'</div>';
+    return;
+  }
   const fmtD = s=>{const p=String(s).split("-");return Number(p[1])+"/"+Number(p[2]);};
-  const salesFor = (store)=> DAILY.filter(d=>d.store===store && d.biz_date>=ws && d.biz_date<=we)
-      .reduce((s,x)=>s+(Number(x.total_sales)||0),0);
+  const salesFor = (storeName, ws)=>{
+    const we = mxShiftDate(ws,6);
+    return DAILY.filter(d=>d.store===storeName && d.biz_date>=ws && d.biz_date<=we).reduce((s,x)=>s+(Number(x.total_sales)||0),0);
+  };
   let sumSales=0, sumHours=0;
-  const trs = rows.map(r=>{
-    const sales = salesFor(r.store);
+  const sortedRows = [...rows].sort((a,b)=> a.week_start<b.week_start?1:(a.week_start>b.week_start?-1:0));
+  const trs = sortedRows.map(r=>{
+    const sales = salesFor(r.store, r.week_start);
     const th = Number(r.total_hours)||0;
     const actual = (sales>0 && th>0) ? sales/th : null;
     if(sales>0 && th>0){ sumSales+=sales; sumHours+=th; }
-    return '<tr><td class="kpi-store">'+escapeHtml(r.store)+'</td>'
+    return '<tr><td class="kpi-store">'+escapeHtml(r.store)+' <span style="color:var(--text-sub);font-weight:400;">('+fmtD(r.week_start)+'週)</span></td>'
       +'<td>'+(r.employee_hours!==null&&r.employee_hours!==undefined?Number(r.employee_hours).toFixed(1)+'h':'–')+'</td>'
       +'<td>'+(r.parttime_hours!==null&&r.parttime_hours!==undefined?Number(r.parttime_hours).toFixed(1)+'h':'–')+'</td>'
       +'<td>'+(th? th.toFixed(1)+'h':'–')+'</td>'
@@ -1393,94 +1638,105 @@ function renderPeople(){
   }).join("");
   const company = sumHours>0 ? sumSales/sumHours : null;
   box.innerHTML = '<div class="mx-updated">'+ (fmtTs(mxMaxTs(LABOR))? "データ最終更新: "+fmtTs(mxMaxTs(LABOR)) : "") +'</div>'
-    +'<div class="mx-head"><div><div class="mx-kicker">全社 人時売上高('+fmtD(ws)+'〜'+fmtD(we)+'週・日報売上÷申告労働時間)</div>'
+    +'<div class="mx-head"><div><div class="mx-kicker">'+mxPeriodLabel()+'の人時売上高('+(store==="all"?"全社":escapeHtml(store))+'・日報売上÷申告労働時間)</div>'
     +'<div class="mx-big">'+(company?fmtYen(company):'–')+'</div></div></div>'
-    +'<div class="mx-chart-wrap"><div class="mx-chart-title">人時売上高の週次推移(店舗別・申告値)</div><canvas id="mxLaborChart" height="120"></canvas></div>'
-    +'<div class="mx-rank-title">■ 店舗別 労働時間と人時売上高(対象週)</div>'
-    +'<div class="kpi-scroll"><table class="kpi-table"><thead><tr><th>店舗</th><th>社員</th><th>アルバイト</th><th>総労働時間</th><th>人時(申告)</th><th>人時(実測)</th></tr></thead><tbody>'+trs+'</tbody></table></div>'
+    +'<div class="mx-chart-wrap"><div class="mx-chart-title">人時売上高の週次推移('+(store==="all"?"店舗別":escapeHtml(store))+'・申告値)<span style="font-weight:400;color:var(--text-sub);"> — '+noteBase+'</span></div><canvas id="mxLaborChart" height="120"></canvas></div>'
+    +'<div class="mx-rank-title">■ 該当週の労働時間と人時売上高</div>'
+    +'<div class="kpi-scroll"><table class="kpi-table"><thead><tr><th>店舗(週)</th><th>社員</th><th>アルバイト</th><th>総労働時間</th><th>人時(申告)</th><th>人時(実測)</th></tr></thead><tbody>'+trs+'</tbody></table></div>'
     +'<div class="mx-note">出典は店長週次フォームの自己申告(週=月〜日)。「実測」は日報売上÷申告労働時間。人件費の金額表示は、深夜分割入力のフォーム改修と社員給与データの受領後に追加します(バイト=時給×時間+深夜1.25倍、社員=日割+社保)。6/15週は一部店舗で社員/アルバイトの入力が逆と思われる値があります(店舗へ確認予定)。</div>';
+  renderLaborChart();
 }
-let MX_I_CHARTS = {};
-function mxWeeksAsc(){
-  return [...new Set(WEEKLY.map(r=>r.week_start))].sort();
+
+/* ---- 主要指標3カード ---- */
+function mxChannelBreakdownHtml(curRows, kind){
+  if(kind==="avgcheck"){
+    return '<div class="mx-note" style="margin-top:8px;">単一店舗表示のため内訳(ランキング)は対象外です</div>';
+  }
+  let pairs;
+  if(kind==="instore"){
+    const lunch = mxSumIf(curRows,"lunch_sales"), dinner = mxSumIf(curRows,"dinner_sales");
+    if(lunch===null) return '<div class="mx-note" style="margin-top:8px;">ランチ/ディナー分解は日次データの反映後に表示されます</div>';
+    pairs = [["ランチ",lunch],["ディナー",dinner||0]];
+  } else {
+    pairs = [["Uber Eats",mxSum(curRows,"delivery_uber")],["出前館",mxSum(curRows,"delivery_demae")],["menu",mxSum(curRows,"delivery_menu")],["ロケットナウ",mxSum(curRows,"delivery_rocketnow")]];
+  }
+  const sum = pairs.reduce((s,p)=>s+p[1],0) || 1;
+  return '<div class="mxi-list">' + pairs.map(p=>'<div class="mxi-row"><span class="nm">'+p[0]+'</span><span class="vl">'+fmtYen(p[1])+'</span><span class="ww">'+(p[1]/sum*100).toFixed(0)+'%</span></div>').join("") + '</div>';
 }
-function mxWowPct(cur, prev){
-  if(cur===null||cur===undefined||prev===null||prev===undefined||Number(prev)===0) return null;
-  return (Number(cur)/Number(prev)-1)*100;
-}
-function mxiCard(elId, title, unitFmt, storeRows, companySeries, note){
+function mxiCard(elId, title, unitFmt, kind, kindKey, fields, note, curRows, prevRows, hasPrev, store){
   const box = document.getElementById(elId);
   if(!box) return;
-  const weeks = mxWeeksAsc();
-  const lastVal = companySeries.length ? companySeries[companySeries.length-1] : null;
-  const prevVal = companySeries.length>1 ? companySeries[companySeries.length-2] : null;
-  const wow = mxWowPct(lastVal, prevVal);
+  const lastVal = mxPeriodValue(curRows, kind, fields);
+  const prevVal = hasPrev ? mxPeriodValue(prevRows, kind, fields) : null;
+  const wow = hasPrev ? mxWowPct(lastVal, prevVal) : null;
   const wowHtml = wow===null ? "" : '<span class="mxi-wow '+(wow<0?"wow-neg":"wow-pos")+'">'+(wow<0?"▼ ":"▲ ")+fmtPct(wow)+'</span>';
-  const rows = storeRows.map(r=>{
-    const ww = r.wow===null||r.wow===undefined ? '<span class="ww">–</span>'
-      : '<span class="ww '+(r.wow<0?"wow-neg":"wow-pos")+'">'+fmtPct(r.wow)+'</span>';
-    return '<div class="mxi-row"><span class="nm">'+escapeHtml(r.name)+'</span><span class="vl">'+(r.value===null?'–':unitFmt(r.value))+'</span>'+ww+'</div>';
-  }).join("");
+
+  let bodyHtml;
+  if(store==="all"){
+    const rows = mxIndicatorStoreRows(curRows, prevRows, kind, fields, hasPrev);
+    bodyHtml = '<div class="mxi-list">' + rows.map(r=>{
+      const ww = (!hasPrev || r.wow===null||r.wow===undefined) ? '<span class="ww">–</span>'
+        : '<span class="ww '+(r.wow<0?"wow-neg":"wow-pos")+'">'+fmtPct(r.wow)+'</span>';
+      return '<div class="mxi-row"><span class="nm">'+escapeHtml(r.name)+'</span><span class="vl">'+(r.value===null?'–':unitFmt(r.value))+'</span>'+ww+'</div>';
+    }).join("") + '</div>';
+  } else {
+    bodyHtml = mxChannelBreakdownHtml(curRows, kindKey);
+  }
+
   box.innerHTML = '<div class="mxi-title">'+title+'</div>'
     +'<div class="mxi-big">'+(lastVal===null?'–':unitFmt(lastVal))+'</div>'+wowHtml
     +'<div class="mxi-chart"><canvas id="'+elId+'Chart" height="90"></canvas></div>'
-    +'<div class="mxi-list">'+rows+'</div>'
+    + bodyHtml
     +(note?'<div class="mx-note" style="margin-top:8px;">'+note+'</div>':'');
 }
-function mxiChart(elId, labels, series, yFmt){
+function mxiChart(elId, labels, datasets, yFmt){
   const cv = document.getElementById(elId+"Chart");
   if(!cv || typeof Chart === "undefined") return;
   if(MX_I_CHARTS[elId]){ MX_I_CHARTS[elId].destroy(); }
   MX_I_CHARTS[elId] = new Chart(cv, { type:"line",
-    data:{ labels: labels, datasets:[mxDs("全社", series, "#0071E3", true)] },
-    options:{ plugins:{legend:{display:false}},
+    data:{ labels: labels, datasets: datasets },
+    options:{ plugins:{legend:{display: datasets.length>1, position:"bottom", labels:{boxWidth:14,boxHeight:2,font:{size:9}}}},
       scales:{ y:{ticks:{callback:yFmt, font:{size:10}}}, x:{ticks:{font:{size:10}, maxTicksLimit:5}} },
       responsive:true, maintainAspectRatio:true } });
 }
 function renderIndicators(){
-  if(!WEEKLY || WEEKLY.length===0) return;
-  const weeks = mxWeeksAsc();
-  const lastW = weeks[weeks.length-1], prevW = weeks.length>1 ? weeks[weeks.length-2] : null;
-  const rowsOf = w => WEEKLY.filter(r=>r.week_start===w && r.store!=="全社合計");
-  const totalOf = w => WEEKLY.find(r=>r.week_start===w && r.store==="全社合計") || {};
-  const fmtD = s=>{const p=String(s).split("-");return Number(p[1])+"/"+Number(p[2]);};
-  const labels = weeks.map(w=>fmtD(w)+"週");
+  const pb = mxPeriodBounds(MX_FILTER.period);
+  if(!pb) return;
+  const store = MX_FILTER.store;
+  const curRows = mxFilterDaily(pb.start, pb.end, store);
+  const prevRows = pb.hasPrev ? mxFilterDaily(pb.prevStart, pb.prevEnd, store) : [];
   const yenS = v=>"¥"+Math.round(v).toLocaleString("ja-JP");
   const yenM = v=>"¥"+(v/10000).toFixed(0)+"万";
 
-  // 1) 店内客単価(全社=Σ店内売上/Σ客数、客数がある店舗のみ)
-  const avgSeries = weeks.map(w=>{
-    let s=0,c=0;
-    rowsOf(w).forEach(r=>{ if(r.customers && r.in_store_sales!==null && r.in_store_sales!==undefined){ s+=Number(r.in_store_sales); c+=Number(r.customers); } });
-    return c>0 ? s/c : null;
-  });
-  const avgRows = rowsOf(lastW).map(r=>{
-    const prev = prevW ? (WEEKLY.find(x=>x.week_start===prevW && x.store===r.store)||{}) : {};
-    return { name: r.store,
-      value: r.avg_check===null||r.avg_check===undefined ? null : Number(r.avg_check),
-      wow: mxWowPct(r.avg_check, prev.avg_check) };
-  }).sort((a,b)=>(b.value||0)-(a.value||0));
-  mxiCard("mxiAvgCheck","店内客単価(週)",yenS,avgRows,avgSeries,"客数未入力の店舗は表示されません");
-  mxiChart("mxiAvgCheck",labels,avgSeries,v=>"¥"+Math.round(v).toLocaleString("ja-JP"));
+  mxiCard("mxiAvgCheck","店内客単価",yenS,"ratio","avgcheck",["in_store_sales","in_store_count"],"客数未入力の店舗は表示されません", curRows, prevRows, pb.hasPrev, store);
+  mxiCard("mxiInStore","店内売上",yenM,"sum","instore",["in_store_sales"],null, curRows, prevRows, pb.hasPrev, store);
+  mxiCard("mxiDelivery","デリバリー売上",yenM,"sum","delivery",["delivery_sales"],"包水道橋はデリバリー未実施(閉店済)", curRows, prevRows, pb.hasPrev, store);
 
-  // 2) 店内売上
-  const inSeries = weeks.map(w=>{ const t=totalOf(w); return t.in_store_sales===undefined?null:Number(t.in_store_sales); });
-  const inRows = rowsOf(lastW).map(r=>{
-    const prev = prevW ? (WEEKLY.find(x=>x.week_start===prevW && x.store===r.store)||{}) : {};
-    return { name:r.store, value: r.in_store_sales===null?null:Number(r.in_store_sales), wow: mxWowPct(r.in_store_sales, prev.in_store_sales) };
-  }).sort((a,b)=>(b.value||0)-(a.value||0));
-  mxiCard("mxiInStore","店内売上(週)",yenM,inRows,inSeries,null);
-  mxiChart("mxiInStore",labels,inSeries,yenM);
-
-  // 3) デリバリー売上(+TOは注記)
-  const dlvSeries = weeks.map(w=>{ const t=totalOf(w); return t.delivery_sales===undefined?null:Number(t.delivery_sales); });
-  const dlvRows = rowsOf(lastW).map(r=>{
-    const prev = prevW ? (WEEKLY.find(x=>x.week_start===prevW && x.store===r.store)||{}) : {};
-    return { name:r.store, value: r.delivery_sales===null?null:Number(r.delivery_sales), wow: mxWowPct(r.delivery_sales, prev.delivery_sales) };
-  }).sort((a,b)=>(b.value||0)-(a.value||0));
-  mxiCard("mxiDelivery","デリバリー売上(週)",yenM,dlvRows,dlvSeries,"包水道橋はデリバリー未実施(閉店済)");
-  mxiChart("mxiDelivery",labels,dlvSeries,yenM);
+  renderIndicatorCharts();
 }
+function renderIndicatorCharts(){
+  const pb = mxPeriodBounds(MX_FILTER.period);
+  if(!pb) return;
+  const store = MX_FILTER.store, gran = MX_FILTER.gran;
+  const curRows = mxFilterDaily(pb.start, pb.end, store);
+  const prevRows = pb.hasPrev ? mxFilterDaily(pb.prevStart, pb.prevEnd, store) : [];
+  const yenS = v=>"¥"+Math.round(v).toLocaleString("ja-JP");
+  const yenM = v=>"¥"+(v/10000).toFixed(0)+"万";
+  const specs = [
+    ["mxiAvgCheck","ratio",["in_store_sales","in_store_count"],yenS],
+    ["mxiInStore","sum",["in_store_sales"],yenM],
+    ["mxiDelivery","sum",["delivery_sales"],yenM],
+  ];
+  specs.forEach(([elId,kind,fields,fmt])=>{
+    const s = mxIndicatorChartSeries(curRows, prevRows, gran, kind, fields, pb.hasPrev);
+    const datasets = pb.hasPrev
+      ? [mxDs("今期間", s.curData, "#0071E3", true), mxDs("前期間", s.prevData, "#B8C0CC")]
+      : [mxDs("実績", s.curData, "#0071E3", true)];
+    mxiChart(elId, s.labels, datasets, fmt);
+  });
+}
+
+/* ---- 目標達成 ---- */
 function renderTargets(){
   const box = document.getElementById("mxTargetCard");
   if(!box) return;
@@ -1488,8 +1744,9 @@ function renderTargets(){
     box.innerHTML = '<div class="mx-note">日別目標売上・各店FL目標は舟久保様から共有いただき次第、ここに「目標達成率バー(店舗別・全社)」と推移を表示します(7/21打合せ合意)。受領後即反映できるよう取込テーブルと表示は実装済みです。</div>';
     return;
   }
-  const mm = new Date().toISOString().slice(0,7);
-  const stores = [...new Set(TARGETS.map(t=>t.store))];
+  const pb = mxPeriodBounds(MX_FILTER.period);
+  if(!pb){ box.innerHTML = '<div class="mx-note">データ準備中です。</div>'; return; }
+  const store = MX_FILTER.store;
   const bar = (label, pct)=>{
     const w = Math.min(100, Math.round(pct));
     const cls = pct>=100 ? "tg-ok" : pct>=80 ? "tg-mid" : "tg-low";
@@ -1497,14 +1754,16 @@ function renderTargets(){
       +'<div class="tg-track"><div class="tg-fill '+cls+'" style="width:'+w+'%"></div></div>'
       +'<div class="tg-pct">'+pct.toFixed(0)+'%</div></div>';
   };
+  const stores = store==="all" ? mxStoreList() : [store];
   let html = "", sumA=0, sumT=0;
   stores.forEach(s=>{
-    const t = TARGETS.filter(x=>x.store===s && String(x.biz_date).slice(0,7)===mm).reduce((a,x)=>a+(Number(x.target_sales)||0),0);
-    const a = DAILY.filter(d=>d.store===s && String(d.biz_date).slice(0,7)===mm).reduce((x,d)=>x+(Number(d.total_sales)||0),0);
+    const t = TARGETS.filter(x=>x.store===s && x.biz_date>=pb.start && x.biz_date<=pb.end).reduce((a,x)=>a+(Number(x.target_sales)||0),0);
+    const a = DAILY.filter(d=>d.store===s && d.biz_date>=pb.start && d.biz_date<=pb.end).reduce((x,d)=>x+(Number(d.total_sales)||0),0);
     if(t>0){ html += bar(s, a/t*100); sumA+=a; sumT+=t; }
   });
-  if(sumT>0){ html = bar("全社合計", sumA/sumT*100) + html; }
-  box.innerHTML = '<div class="mx-kicker">当月の売上目標達成率(月初〜最新日の目標累計比)</div>' + html;
+  if(store==="all" && sumT>0){ html = bar("全社合計", sumA/sumT*100) + html; }
+  if(!html){ html = '<div class="mx-note">選択した期間・店舗の目標データがありません。</div>'; }
+  box.innerHTML = '<div class="mx-kicker">'+mxPeriodLabel()+'の売上目標達成率('+(store==="all"?"全社・店舗別":escapeHtml(store))+')</div>' + html;
 }
 function renderHome(){
   const openTopics = TOPICS.filter(t => t.status === "open" || t.status === "watching").length;
