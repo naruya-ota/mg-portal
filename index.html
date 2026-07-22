@@ -60,7 +60,7 @@
   }
   .login-box h1{font-size:17px;font-weight:600;color:var(--text);margin:0 0 6px;letter-spacing:0;}
   .login-box p{font-size:13px;color:var(--text-sub);margin:0 0 20px;}
-  .login-box input[type=email]{
+  .login-box input[type=email], .login-box input[type=text]{
     width:100%;padding:11px 14px;border:1px solid var(--border);
     border-radius:10px;font-size:14px;font-family:inherit;margin-bottom:12px;
     background:#FAFAFA;
@@ -718,7 +718,12 @@
     <h1>MINORU × 業務プロセス設計所</h1>
     <p>コラボレーションポータルです。許可されたメールアドレスにログイン用リンクをお送りします。</p>
     <input type="email" id="loginEmail" placeholder="メールアドレス" autocomplete="email">
-    <button id="loginBtn">ログインリンクを送信</button>
+    <button id="loginBtn">認証コードを送信</button>
+    <div id="otpBlock" style="display:none;margin-top:14px;">
+      <p style="font-size:13px;color:var(--text-sub);margin:0 0 8px;">メールに届いた<strong>6桁の認証コード</strong>を入力してください</p>
+      <input type="text" id="otpCode" inputmode="numeric" autocomplete="one-time-code" maxlength="6" placeholder="6桁コード" style="letter-spacing:0.2em;text-align:center;font-size:18px;">
+      <button id="otpBtn" style="margin-top:8px;">コードでログイン</button>
+    </div>
     <div id="loginMsg"></div>
   </div>
 </div>
@@ -996,12 +1001,37 @@ loginBtn.addEventListener("click", async ()=>{
   loginBtn.textContent = "ログインリンクを送信";
   if(error){
     loginMsg.className = "login-msg err";
-    loginMsg.textContent = "送信に失敗しました: " + error.message;
+    loginMsg.textContent = "送信に失敗しました: " + (error.message || "しばらくおいて再度お試しください");
   } else {
     loginMsg.className = "login-msg ok";
-    loginMsg.textContent = "ログイン用リンクを送信しました。メールをご確認ください。(許可リスト外のアドレスの場合はログインできません)";
+    loginMsg.textContent = "メールを送信しました。届いた6桁の認証コードを下に入力してください。";
+    document.getElementById("otpBlock").style.display = "block";
+    document.getElementById("otpCode").focus();
   }
 });
+
+const otpBtn = document.getElementById("otpBtn");
+const otpCode = document.getElementById("otpCode");
+async function submitOtp(){
+  const email = loginEmail.value.trim();
+  const code = otpCode.value.trim();
+  if(!email || code.length < 6){
+    loginMsg.className = "login-msg err";
+    loginMsg.textContent = "メールアドレスと6桁のコードを入力してください。";
+    return;
+  }
+  otpBtn.disabled = true;
+  otpBtn.textContent = "確認中…";
+  const { error } = await supabase.auth.verifyOtp({ email: email, token: code, type: "email" });
+  otpBtn.disabled = false;
+  otpBtn.textContent = "コードでログイン";
+  if(error){
+    loginMsg.className = "login-msg err";
+    loginMsg.textContent = "コードが確認できませんでした(期限切れ・入力誤りの可能性)。もう一度「認証コードを送信」からやり直してください。";
+  }
+}
+otpBtn.addEventListener("click", submitOtp);
+otpCode.addEventListener("keydown", (e)=>{ if(e.key === "Enter") submitOtp(); });
 
 document.getElementById("logoutBtn").addEventListener("click", async ()=>{
   await supabase.auth.signOut();
