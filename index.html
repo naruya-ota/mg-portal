@@ -771,6 +771,72 @@
     background:#FAFAFA;cursor:pointer;
   }
   .mx-filterbar .gran-row{margin:0 0 0 4px;}
+
+  /* ===== メトリクス アクションボタン(PDF出力・A3ポスター) ===== */
+  .mx-action-row{display:flex;gap:10px;margin-bottom:12px;flex-wrap:wrap;}
+  .mx-action-btn{
+    border:1px solid var(--border);background:#fff;color:var(--text);
+    padding:9px 16px;border-radius:999px;font-size:13px;font-weight:600;
+    cursor:pointer;font-family:inherit;box-shadow:var(--shadow);
+  }
+  .mx-action-btn:hover{border-color:var(--navy-light);background:#F5F5F7;}
+
+  /* ===== 店舗選択モーダル(A3ポスター) ===== */
+  .mxa3-store-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;}
+  @media (max-width:480px){.mxa3-store-grid{grid-template-columns:1fr;}}
+  .mxa3-store-btn{
+    border:1px solid var(--border);background:#fff;color:var(--text);
+    padding:14px;border-radius:12px;font-size:13.5px;font-weight:600;
+    cursor:pointer;font-family:inherit;text-align:left;
+  }
+  .mxa3-store-btn:hover{border-color:var(--navy-light);background:#F5F5F7;}
+
+  /* ===== A3ポスター本体(印刷時のみ表示) ===== */
+  #mxA3PosterRoot{display:none;}
+  .mxa3-page{
+    width:100%;font-family:-apple-system,BlinkMacSystemFont,"SF Pro Text","Hiragino Sans","Hiragino Kaku Gothic ProN",sans-serif;
+    color:#1D1D1F;
+  }
+  .mxa3-header{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:4px solid #1D1D1F;padding-bottom:10px;margin-bottom:14px;}
+  .mxa3-store-name{font-size:40pt;font-weight:800;letter-spacing:-0.01em;line-height:1.05;}
+  .mxa3-header-sub{font-size:15pt;font-weight:700;color:#0059B3;margin-top:4px;}
+  .mxa3-header-right{font-size:11pt;color:#6E6E73;font-weight:600;white-space:nowrap;}
+  .mxa3-top{display:flex;gap:22px;margin-bottom:16px;}
+  .mxa3-top-left{flex:1.15;display:flex;flex-direction:column;gap:14px;}
+  .mxa3-top-right{flex:1;border:2px solid #E4E4E7;border-radius:14px;padding:14px 16px;}
+  .mxa3-metric-block{border:2px solid #E4E4E7;border-radius:14px;padding:14px 18px;}
+  .mxa3-metric-title{font-size:12pt;font-weight:700;color:#6E6E73;margin-bottom:6px;}
+  .mxa3-big-num{font-size:44pt;font-weight:800;line-height:1.05;letter-spacing:-0.01em;}
+  .mxa3-sub-label{font-size:11.5pt;color:#6E6E73;font-weight:600;margin-top:4px;}
+  .mxa3-diff{font-size:16pt;font-weight:800;margin-top:4px;}
+  .mxa3-good{color:#1D7A3E;}
+  .mxa3-bad{color:#B42318;}
+  .mxa3-note{font-size:11pt;color:#6E6E73;}
+  .mxa3-trend-title{font-size:12pt;font-weight:700;color:#6E6E73;margin-bottom:8px;}
+  .mxa3-trend-table{border-collapse:collapse;width:100%;font-size:12pt;}
+  .mxa3-trend-table th{background:#F5F5F7;color:#6E6E73;font-weight:700;padding:6px 8px;text-align:right;border-bottom:1px solid #E4E4E7;}
+  .mxa3-trend-table th:first-child{text-align:left;}
+  .mxa3-trend-table td{padding:6px 8px;text-align:right;border-bottom:1px solid #F0F0F2;font-weight:700;}
+  .mxa3-trend-table td.mxa3-trend-week{text-align:left;font-weight:600;color:#1D1D1F;}
+  .mxa3-hm-heading{font-size:13pt;font-weight:800;margin:4px 0 10px;padding-bottom:6px;border-bottom:2px solid #1D1D1F;}
+  .mxa3-hm-table{border-collapse:collapse;width:100%;table-layout:fixed;}
+  .mxa3-hm-table th{background:#F5F5F7;color:#6E6E73;font-weight:700;font-size:10.5pt;padding:6px 4px;text-align:center;border:1px solid #E4E4E7;}
+  .mxa3-hm-table th.mxa3-hm-corner{text-align:left;}
+  .mxa3-hm-table .mxa3-prelim-tag{font-size:8.5pt;font-weight:700;color:#B44708;}
+  .mxa3-hm-rowlabel{font-size:12pt;font-weight:800;text-align:left;background:#F5F5F7;padding:8px 10px;border:1px solid #E4E4E7;white-space:nowrap;}
+  .mxa3-hm-target{font-size:9pt;font-weight:600;color:#6E6E73;}
+  .mxa3-hm-cell{font-size:20pt;font-weight:800;text-align:center;padding:8px 2px;border:1px solid #E4E4E7;}
+  .mxa3-footer{margin-top:14px;padding-top:10px;border-top:2px solid #1D1D1F;font-size:11pt;font-weight:600;color:#3A3A3C;}
+
+  /* ===== 印刷共通(機能1: PDF出力) ===== */
+  @page{ size: A4 portrait; margin: 12mm; }
+  @media print{
+    header.app-header, nav.tabbar, .mx-filterbar, .mx-action-row, #toastBox, footer.app-footer, .mx-proto-overlay, #mxA3Modal{ display:none !important; }
+    body{ background:#fff; }
+    main{ max-width:100%; margin:0; padding:0 4px; }
+    .card, .mxi-card{ break-inside:avoid; page-break-inside:avoid; box-shadow:none; border-color:#ccc; }
+    *{ -webkit-print-color-adjust:exact !important; print-color-adjust:exact !important; color-adjust:exact !important; }
+  }
 </style>
 </head>
 <body>
@@ -888,6 +954,11 @@
   <section id="panel-metrics" class="panel">
     <h1 class="page-title">メトリクス</h1>
     <p style="font-size:13px;color:var(--text-sub);margin:-8px 0 16px;">週次は速報値です。確定値は月次でご報告します。</p>
+
+    <div class="mx-action-row">
+      <button class="mx-action-btn" id="mxPdfBtn">📄 PDF出力</button>
+      <button class="mx-action-btn" id="mxA3Btn">🏪 店舗掲示用A3</button>
+    </div>
 
     <div class="mx-filterbar">
       <span class="mx-filterbar-label">期間</span>
@@ -1020,6 +1091,20 @@
 </footer>
 
 </div><!-- /appRoot -->
+
+<!-- ============ A3ポスター: 店舗選択モーダル ============ -->
+<div class="mx-proto-overlay" id="mxA3Modal">
+  <div class="mx-proto-modal">
+    <div class="mx-proto-modal-head">
+      <div class="mx-proto-modal-title">店舗掲示用A3ポスター — 店舗を選択</div>
+      <button class="mx-proto-close" id="mxA3ModalClose">✕</button>
+    </div>
+    <div class="mxa3-store-grid" id="mxA3StoreList"></div>
+  </div>
+</div>
+
+<!-- ============ A3ポスター: 印刷専用DOM(通常時は非表示) ============ -->
+<div id="mxA3PosterRoot"></div>
 
 <div id="toastBox"></div>
 <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
@@ -1290,7 +1375,7 @@ function renderWeekly(){
       + '<div class="kpi-scroll"><table class="kpi-table">'
       + '<thead><tr><th>\u5e97\u8217</th><th>\u9031\u9593\u7dcf\u58f2\u4e0a</th><th>\u524d\u9031\u6bd4</th><th>\u5e97\u5185\u58f2\u4e0a</th><th>\u30c7\u30ea\u30d0\u30ea\u30fc+TO</th><th>\u5ba2\u6570(\u5e97\u5185)</th><th>\u5ba2\u5358\u4fa1</th><th>\u6708\u7d2f\u8a08</th></tr></thead>'
       + '<tbody>' + stores.map(tr).join("") + (total ? tr(total) : "") + '</tbody></table></div>'
-      + '<div class="report-note" style="margin-top:12px;">7/15\u306e\u9031\u304b\u3089\u6c60\u5c3b\u5927\u6a4b\u5e97\u30fb\u99d2\u6ca2\u30d1\u30fc\u30af\u30af\u30a9\u30fc\u30bf\u30fc\u5e97\u306e\u65e5\u5831\u304c\u52a0\u308f\u308a\u30016\u5e97\u8217\u306e\u96c6\u8a08\u306b\u306a\u308a\u307e\u3057\u305f(7/9\u9031\u4ee5\u524d\u306f4\u5e97\u8217)\u3002\u96c6\u8a08\u7bc4\u56f2\u304c\u5909\u308f\u3063\u305f\u9031\u306f\u5168\u793e\u306e\u524d\u9031\u6bd4\u3092\u8868\u793a\u3057\u307e\u305b\u3093\u3002\u6570\u5024\u306f\u901f\u5831\u5024\u3067\u3001\u78ba\u5b9a\u5024\u306f\u6708\u6b21\u3067\u3054\u5831\u544a\u3057\u307e\u3059\u3002\u5ba2\u6570\u30fb\u5ba2\u5358\u4fa1\u306f\u5e97\u5185\u5ba2\u6570\u306e\u65e5\u5831\u5165\u529b\u304c\u3042\u308b\u5e97\u8217\u306e\u307f\u8868\u793a\u3055\u308c\u307e\u3059\u3002</div>';
+      + '<div class="report-note" style="margin-top:12px;">7/15\u306e\u9031\u304b\u3089\u6c60\u5c3b\u5927\u6a4b\u5e97\u30fb\u99d2\u6ca2\u30d1\u30fc\u30af\u30af\u30a9\u30fc\u30bf\u30fc\u5e97\u306e\u65e5\u5831\u304c\u52a0\u308f\u308a\u30016\u5e97\u8217\u306e\u96c6\u8a08\u306b\u306a\u308a\u307e\u3057\u305f(7/9\u9031\u4ee5\u524d\u306f4\u5e97\u8217)\u3002\u96c6\u8a08\u7bc4\u56f2\u304c\u5909\u308f\u3063\u305f\u9031\u306f\u5168\u793e\u306e\u524d\u9031\u6bd4\u3092\u8868\u793a\u3057\u307e\u305b\u3093\u3002\u6570\u5024\u306f\u901f\u5831\u5024\u3067\u3001\u78ba\u5b9a\u5024\u306f\u6708\u6b21\u3067\u3054\u5831\u544a\u3057\u307e\u3059\u3002\u5ba2\u6570\u30fb\u5ba2\u5358\u4fa1\u306f\u5e97\u5185\u5ba2\u6570\u306e\u65e5\u5831\u5165\u529b\u304c\u3042\u308b\u5e97\u8217\u306e\u307f\u8868\u793a\u3055\u308c\u307e\u3059\u3002\u203b\u3053\u306e\u4e00\u89a7\u306f\u53d6\u5f97\u30bf\u30a4\u30df\u30f3\u30b0\u57fa\u6e96\u306e\u30ed\u30fc\u30ea\u30f3\u30b0\u9031(\u6708\u66dc\u8d77\u70b9\u3067\u306f\u3042\u308a\u307e\u305b\u3093)\u3067\u3059\u3002\u6708\u66dc\uff5e\u65e5\u66dc\u3067\u63c3\u3048\u305f\u6b63\u5f0f\u306a\u9031\u6b21\u306f\u30e1\u30c8\u30ea\u30af\u30b9\u30bf\u30d6\u306e\u300c\u9031\u5225\u300d\u30c9\u30ea\u30eb\u30c0\u30a6\u30f3\u3084\u5e97\u8217\u63b2\u793a\u7528A3\u30dd\u30b9\u30bf\u30fc\u3067\u3054\u78ba\u8a8d\u3044\u305f\u3060\u3051\u307e\u3059\u3002</div>';
     box.appendChild(card);
   });
 }
@@ -1948,6 +2033,9 @@ function mxMonthlySeriesFor(storeSel){
     const row = mxMonthlyRowFor(targetStore, m);
     const agg = row ? { sales: Number(row.sales)||0, cogs: Number(row.cogs)||0, personnel: (row.personnel===null||row.personnel===undefined)?null:Number(row.personnel) } : null;
     const ratios = mxMonthlyRatios(agg);
+    // 速報月は給与仕訳が未計上(給与処理は毎月10日)のためpersonnelがほぼゼロで率が誤誘導的に低くなる。
+    // 人件費率・FL率は速報月に限り非表示(「–」)にする。原価率(cogsR)は仕入連携済みのため表示継続。
+    if(mxMonthlyIsPrelim(m)){ ratios.persR = null; ratios.flR = null; }
     return { month: m, sales: agg ? agg.sales : null, personnel: agg ? agg.personnel : null, cogsR: ratios.cogsR, persR: ratios.persR, flR: ratios.flR };
   });
 }
@@ -2001,6 +2089,7 @@ function mxMonthlyCogsRatioVal(r){ const s=Number(r.sales)||0; return s ? Number
 function mxMonthlyPersRatioVal(r){
   const s=Number(r.sales)||0;
   if(!s || r.personnel===null || r.personnel===undefined) return null;
+  if(mxMonthlyIsPrelim(r.month)) return null; // 速報月は給与仕訳未計上(給与処理は毎月10日)のため非表示
   return Number(r.personnel)/s*100;
 }
 function mxMonthlyFlRatioVal(r){
@@ -2145,9 +2234,15 @@ function mxHmValueFor(row, key){
   const sales = Number(row.sales)||0;
   if(!sales) return null;
   if(key==="cogs") return Number(row.cogs)/sales*100;
-  if(key==="personnel") return (row.personnel===null||row.personnel===undefined)?null:Number(row.personnel)/sales*100;
+  if(key==="personnel"){
+    if(row.personnel===null||row.personnel===undefined) return null;
+    // 速報月は給与仕訳未計上(給与処理は毎月10日)のためpersonnelがほぼゼロで率が誤誘導的に低くなる→非表示
+    if(mxMonthlyIsPrelim(row.month)) return null;
+    return Number(row.personnel)/sales*100;
+  }
   if(key==="fl"){
     if(row.personnel===null||row.personnel===undefined) return null;
+    if(mxMonthlyIsPrelim(row.month)) return null;
     return (Number(row.cogs)+Number(row.personnel))/sales*100;
   }
   return null;
@@ -2185,6 +2280,236 @@ function mxHeatmapSectionHtml(selStore){
   return MX_HM_METRICS.map(metric=>mxHeatmapTableHtml(metric, months, selStore)).join("");
 }
 
+/* ==========================================================================
+   PDF出力・店舗掲示用A3ポスター
+   ========================================================================== */
+
+/* ---- 月曜起点の週(直近完了週)ヘルパー
+   「今週」=daily_kpis最新日を含む月〜日、「先週(直近完了週)」=その1つ前の月〜日。
+   実時刻ではなくデータ最終日を基準にすることで、閲覧タイミングに関係なく常に
+   「データ上の直近完了週」を指す(現在時刻ベースだと将来データが追いつくまで空になるため)。 ---- */
+function mxAnchorDate(){
+  return mxDailyMaxDate() || new Date().toISOString().slice(0,10);
+}
+function mxCurrentWeekMonday(){
+  return mxWeekMonday(mxAnchorDate());
+}
+function mxLastCompleteWeekRange(){
+  const thisMon = mxCurrentWeekMonday();
+  return { start: mxShiftDate(thisMon, -7), end: mxShiftDate(thisMon, -1) };
+}
+function mxA3RangeLabel(start, end){
+  const f = s=>{ const p=String(s).split("-"); return Number(p[1])+"/"+Number(p[2]); };
+  return f(start)+"〜"+f(end);
+}
+
+const MXA3_STORES = MX_STORE_NAMES; // 6店舗(水道橋店は業態転換後2026/5に営業再開済みのため含める)
+
+/* ---- 上段①: 先週の売上 vs 目標(sales_targets)。目標未登録時は前週比にフォールバック ---- */
+function mxA3SalesBlock(store){
+  const {start,end} = mxLastCompleteWeekRange();
+  const label = mxA3RangeLabel(start,end);
+  const actualRows = (DAILY||[]).filter(d=>d.store===store && d.biz_date>=start && d.biz_date<=end);
+  if(!actualRows.length){
+    return { label, html:'<div class="mxa3-big-num">–</div><div class="mxa3-sub-label">対象週の売上データがありません</div>' };
+  }
+  const actual = mxSum(actualRows, "total_sales");
+  const targetRows = (TARGETS||[]).filter(t=>t.store===store && t.biz_date>=start && t.biz_date<=end);
+  const target = targetRows.length ? mxSum(targetRows, "target_sales") : null;
+  let html;
+  if(target && target>0){
+    const pct = actual/target*100;
+    const diff = actual-target;
+    const ok = actual>=target;
+    html = ''
+      + '<div class="mxa3-big-num '+(ok?'mxa3-good':'mxa3-bad')+'">'+fmtYen(actual)+'</div>'
+      + '<div class="mxa3-sub-label">目標 '+fmtYen(target)+'(達成率 '+pct.toFixed(0)+'%)</div>'
+      + '<div class="mxa3-diff '+(ok?'mxa3-good':'mxa3-bad')+'">'+(diff>=0?'+':'')+fmtYen(diff)+' '+(ok?'達成':'未達')+'</div>';
+  } else {
+    const prevEnd = mxShiftDate(start,-1);
+    const prevStart = mxShiftDate(prevEnd,-6);
+    const prevRows = (DAILY||[]).filter(d=>d.store===store && d.biz_date>=prevStart && d.biz_date<=prevEnd);
+    const prevActual = prevRows.length ? mxSum(prevRows, "total_sales") : null;
+    const wow = (prevActual!==null && prevActual>0) ? (actual/prevActual-1)*100 : null;
+    html = ''
+      + '<div class="mxa3-big-num">'+fmtYen(actual)+'</div>'
+      + '<div class="mxa3-sub-label">目標未設定(sales_targets未登録)</div>'
+      + (wow!==null
+        ? '<div class="mxa3-diff '+(wow>=0?'mxa3-good':'mxa3-bad')+'">前週比 '+fmtPct(wow)+'</div>'
+        : '<div class="mxa3-sub-label">前週データなし</div>');
+  }
+  return { label, html };
+}
+
+/* ---- 上段②: バイト人件費率 = Σ当日parttime_cost ÷ Σ当日daily_kpis売上(直近完了週) ---- */
+function mxA3LaborBlock(store){
+  const {start,end} = mxLastCompleteWeekRange();
+  const laborRows = (DAILY_LABOR[store]||[]).filter(r=>r.date>=start && r.date<=end);
+  const salesRows = (DAILY||[]).filter(d=>d.store===store && d.biz_date>=start && d.biz_date<=end);
+  const cost = laborRows.reduce((s,r)=>s+(Number(r.parttime_cost)||0),0);
+  const sales = mxSum(salesRows, "total_sales");
+  const ratio = (laborRows.length && sales>0) ? cost/sales*100 : null;
+  const target = 30;
+  if(ratio===null){
+    return '<div class="mxa3-big-num">–</div><div class="mxa3-sub-label">データ不足(勤怠実測または売上が未収集)</div>';
+  }
+  const diff = ratio-target;
+  const ok = ratio<=target;
+  return ''
+    + '<div class="mxa3-big-num '+(ok?'mxa3-good':'mxa3-bad')+'">'+ratio.toFixed(1)+'%</div>'
+    + '<div class="mxa3-sub-label">目標 '+target+'%(バイト人件費実額÷売上)</div>'
+    + '<div class="mxa3-diff '+(ok?'mxa3-good':'mxa3-bad')+'">'+(diff>=0?'+':'')+diff.toFixed(1)+'pt '+(ok?'達成':'超過')+'</div>';
+}
+
+/* ---- 上段右: 直近数週の売上・バイト人件費率の推移(月曜起点の週で集計) ---- */
+function mxA3WeeklyTrendHtml(store, weeksCount){
+  weeksCount = weeksCount || 6;
+  const storeDaily = (DAILY||[]).filter(d=>d.store===store);
+  const salesBuckets = mxBucketSum(storeDaily, "weekly", "total_sales");
+  const laborRowsAll = (DAILY_LABOR[store]||[]).map(r=>({biz_date:r.date, parttime_cost:r.parttime_cost}));
+  const laborBuckets = mxBucketSum(laborRowsAll, "weekly", "parttime_cost");
+  const {start:lastMonday} = mxLastCompleteWeekRange();
+  const rows = salesBuckets.filter(b=>b.key<=lastMonday && b.value!==null).slice(-weeksCount).map(b=>{
+    const lb = laborBuckets.find(x=>x.key===b.key);
+    const laborCost = (lb && lb.value!==null) ? lb.value : null;
+    const ratio = (b.value && laborCost!==null) ? laborCost/b.value*100 : null;
+    return { label:b.label.replace(/週$/,""), sales:b.value, ratio };
+  });
+  if(!rows.length) return '<div class="mxa3-note">推移データがありません。</div>';
+  const trs = rows.map(r=>{
+    const ratioCls = r.ratio===null ? "" : (r.ratio<=30 ? "mxa3-good" : "mxa3-bad");
+    return '<tr><td class="mxa3-trend-week">'+escapeHtml(r.label)+'</td>'
+      +'<td>'+fmtYen(r.sales)+'</td>'
+      +'<td class="'+ratioCls+'">'+(r.ratio===null?"–":r.ratio.toFixed(1)+"%")+'</td></tr>';
+  }).join("");
+  return '<table class="mxa3-trend-table"><thead><tr><th>週(月曜起点)</th><th>週次売上</th><th>バイト人件費率</th></tr></thead><tbody>'+trs+'</tbody></table>';
+}
+
+/* ---- 下段: F/L/R比率ヒートマップ(選択店舗のみ・12ヶ月+速報列) ---- */
+const MXA3_HM_ROWS = [
+  { label:"F 原価率", key:"cogs", good:30, warn:32 },
+  { label:"L 人件費率", key:"personnel", good:28, warn:32 },
+  { label:"R 家賃率", key:"rent", good:10, warn:15 },
+];
+function mxA3HmValueFor(row, key){
+  if(!row) return null;
+  const sales = Number(row.sales)||0;
+  if(!sales) return null;
+  if(key==="rent"){
+    if(row.rent===null||row.rent===undefined) return null;
+    return Number(row.rent)/sales*100;
+  }
+  return mxHmValueFor(row, key);
+}
+function mxA3HeatmapHtml(store){
+  const months = mxMonthlyAllMonths();
+  const header = '<tr><th class="mxa3-hm-corner">指標(目標)</th>'+months.map(m=>{
+    const prelim = mxMonthlyIsPrelim(m);
+    return '<th>'+mxMonthlyLabel(m)+(prelim?'<br><span class="mxa3-prelim-tag">🧪速報</span>':'')+'</th>';
+  }).join("")+'</tr>';
+  const body = MXA3_HM_ROWS.map(r=>{
+    const cells = months.map(m=>{
+      const row = mxMonthlyRowFor(store, m);
+      const val = mxA3HmValueFor(row, r.key);
+      const cls = mxHmCellClass(val, r.good, r.warn);
+      const text = val===null ? "–" : val.toFixed(1)+"%";
+      return '<td class="mxa3-hm-cell '+cls+'">'+text+'</td>';
+    }).join("");
+    return '<tr><td class="mxa3-hm-rowlabel">'+r.label+'<br><span class="mxa3-hm-target">(目標'+r.good+'%以下)</span></td>'+cells+'</tr>';
+  }).join("");
+  const prelimMonths = months.filter(m=>mxMonthlyIsPrelim(m));
+  const laborBlackoutNote = prelimMonths.length
+    ? '<div class="mxa3-note" style="margin-top:6px;">🧪 '+prelimMonths.map(m=>mxMonthlyLabel(m)).join("・")+'度(速報)のL(人件費率)は「–」表示です。給与仕訳は毎月10日の給与処理後にfreeeへ反映されるため、速報時点では正しい率を計算できません。確定後にご報告します。</div>'
+    : '';
+  return '<table class="mxa3-hm-table"><thead>'+header+'</thead><tbody>'+body+'</tbody></table>' + laborBlackoutNote;
+}
+
+/* ---- ポスター組み立て ---- */
+function buildA3PosterHtml(store){
+  const sales = mxA3SalesBlock(store);
+  const labor = mxA3LaborBlock(store);
+  const trend = mxA3WeeklyTrendHtml(store, 6);
+  const heatmap = mxA3HeatmapHtml(store);
+  const genDate = new Date().toLocaleDateString("ja-JP", {year:"numeric", month:"numeric", day:"numeric"});
+  return ''
+    + '<div class="mxa3-page">'
+    +   '<div class="mxa3-header">'
+    +     '<div><div class="mxa3-store-name">'+escapeHtml(store)+'</div>'
+    +       '<div class="mxa3-header-sub">先週の数字('+sales.label+')</div></div>'
+    +     '<div class="mxa3-header-right">生成日: '+genDate+'</div>'
+    +   '</div>'
+    +   '<div class="mxa3-top">'
+    +     '<div class="mxa3-top-left">'
+    +       '<div class="mxa3-metric-block"><div class="mxa3-metric-title">① 先週の売上(週次で追う)</div>'+sales.html+'</div>'
+    +       '<div class="mxa3-metric-block"><div class="mxa3-metric-title">② バイト人件費率(週次で追う)</div>'+labor+'</div>'
+    +     '</div>'
+    +     '<div class="mxa3-top-right"><div class="mxa3-trend-title">直近推移(月曜起点の週)</div>'+trend+'</div>'
+    +   '</div>'
+    +   '<div class="mxa3-bottom">'
+    +     '<div class="mxa3-hm-heading">月次の体質 — F/L/R比率 12ヶ月(月次でしか見えない構造)</div>'
+    +     heatmap
+    +   '</div>'
+    +   '<div class="mxa3-footer">確定値=freee(2026-07-22取得) / 速報値=店舗日報・勤怠実測&nbsp;&nbsp;|&nbsp;&nbsp;毎週更新して貼り替えてください</div>'
+    + '</div>';
+}
+
+/* ---- 印刷制御: 通常のPDF出力(A4縦・既定)/ A3ポスター(印刷時のみA3横に切替) ---- */
+let mxA3StyleTag = null;
+function mxA3EnsurePrintStyle(){
+  if(mxA3StyleTag) return;
+  mxA3StyleTag = document.createElement("style");
+  mxA3StyleTag.id = "mxA3PrintStyleOverride";
+  mxA3StyleTag.textContent =
+    '@page{ size:A3 landscape; margin:12mm; }'
+    + '@media print{'
+    + 'body.mx-a3-printing > *:not(#mxA3PosterRoot){ display:none !important; }'
+    + '#mxA3PosterRoot{ display:block !important; }'
+    + '}';
+  document.head.appendChild(mxA3StyleTag);
+}
+function mxA3RemovePrintStyle(){
+  if(mxA3StyleTag){ mxA3StyleTag.remove(); mxA3StyleTag = null; }
+}
+function mxA3GenerateAndPrint(store){
+  const root = document.getElementById("mxA3PosterRoot");
+  if(!root) return;
+  root.innerHTML = buildA3PosterHtml(store);
+  mxA3EnsurePrintStyle();
+  document.body.classList.add("mx-a3-printing");
+  const cleanup = ()=>{
+    document.body.classList.remove("mx-a3-printing");
+    mxA3RemovePrintStyle();
+    root.innerHTML = "";
+    window.removeEventListener("afterprint", cleanup);
+  };
+  window.addEventListener("afterprint", cleanup);
+  setTimeout(()=> window.print(), 60);
+}
+function mxA3OpenStoreModal(){
+  const modal = document.getElementById("mxA3Modal");
+  const list = document.getElementById("mxA3StoreList");
+  if(!modal || !list) return;
+  list.innerHTML = MXA3_STORES.map(s=>
+    '<button class="mxa3-store-btn" data-store="'+escapeAttr(s)+'">'+escapeHtml(s)+'</button>'
+  ).join("");
+  list.querySelectorAll(".mxa3-store-btn").forEach(btn=>{
+    btn.onclick = ()=>{ mxA3CloseStoreModal(); mxA3GenerateAndPrint(btn.dataset.store); };
+  });
+  modal.classList.add("open");
+}
+function mxA3CloseStoreModal(){
+  const modal = document.getElementById("mxA3Modal");
+  if(modal) modal.classList.remove("open");
+}
+function mxA3WireButtons(){
+  const pdfBtn = document.getElementById("mxPdfBtn");
+  const a3Btn = document.getElementById("mxA3Btn");
+  const closeBtn = document.getElementById("mxA3ModalClose");
+  if(pdfBtn) pdfBtn.addEventListener("click", ()=> window.print());
+  if(a3Btn) a3Btn.addEventListener("click", mxA3OpenStoreModal);
+  if(closeBtn) closeBtn.addEventListener("click", mxA3CloseStoreModal);
+}
+mxA3WireButtons();
 
 /* ==========================================================================
    速報値レイヤー(β)
@@ -2551,17 +2876,20 @@ function mxProtoRenderLaborRatioDailyChart(store){
   if(dsel){ dsel.onchange = ()=>{ MX_PROTO_MODAL.laborDailyMonth = dsel.value; mxProtoRenderModal(); }; }
 }
 function mxProtoSalesWeeklyHtml(store){
-  const target = store==="all" ? "全社合計" : store;
-  const rows = (WEEKLY||[]).filter(r=>r.store===target).slice().sort((a,b)=>a.week_start<b.week_start?-1:1);
-  if(!rows.length) return '<div class="mx-note">対象店舗の週次データが見つかりません。</div>';
-  const max = Math.max(...rows.map(r=>Number(r.total_sales)||0), 1);
-  const bars = rows.map(r=>{
-    const v = Number(r.total_sales)||0;
+  // weekly_kpisはローリング週(月曜起点でない)スナップショットのため、月曜起点の
+  // 週(月〜日)で正しく比較できるようdaily_kpisから再集計する(データソース台帳 既知課題8対応)。
+  const rows = store==="all" ? (DAILY||[]) : (DAILY||[]).filter(d=>d.store===store);
+  const buckets = mxBucketSum(rows, "weekly", "total_sales").filter(b=>b.value!==null);
+  if(!buckets.length) return '<div class="mx-note">対象店舗の週次データが見つかりません。</div>';
+  const {start:lastMonday} = mxLastCompleteWeekRange();
+  const max = Math.max(...buckets.map(b=>b.value||0), 1);
+  const bars = buckets.map(b=>{
+    const v = b.value||0;
     const w = Math.max(2, Math.round(v/max*100));
-    const label = r.week_start.slice(5).replace("-","/")+"週";
+    const label = b.label.replace("週","") + (b.key===lastMonday ? "(先週)" : "");
     return '<div class="mx-proto-bar-row"><div class="mx-proto-bar-label">'+label+'</div><div class="mx-proto-bar-track"><div class="mx-proto-bar-fill" style="width:'+w+'%;background:#1D9A56;"></div></div><div class="mx-proto-bar-val">'+fmtYen(v)+'</div></div>';
   }).join("");
-  return '<div class="mx-proto-bars">'+bars+'</div>';
+  return '<div class="mx-note" style="margin-bottom:8px;">月曜起点の週(月〜日)でdaily_kpisから集計しています。「(先週)」=直近の完了週。</div><div class="mx-proto-bars">'+bars+'</div>';
 }
 function mxProtoWeeklyActualForWeek(store, weekStart){
   const weekEnd = mxShiftDate(weekStart, 6);
@@ -2846,8 +3174,11 @@ function renderMonthly(){
   const opChip = (juneOpVal!==null) ? '<div class="mx-proto-chip">🧪 速報: 2026年6月 '+fmtYen(juneOpVal)+'(freee速報)</div>' : '';
   const juneCompany = (juneIdx6>=0) ? companySeries[juneIdx6] : null;
   const cogsChip = (juneCompany && juneCompany.cogsR!==null) ? '<div class="mx-proto-chip">🧪 速報: 2026年6月 '+juneCompany.cogsR.toFixed(1)+'%(freee速報)</div>' : '';
-  const persChip = (juneCompany && juneCompany.persR!==null) ? '<div class="mx-proto-chip">🧪 速報: 2026年6月 '+juneCompany.persR.toFixed(1)+'%(freee速報)</div>' : '';
-  const flChip = (juneCompany && juneCompany.flR!==null) ? '<div class="mx-proto-chip">🧪 速報: 2026年6月 '+juneCompany.flR.toFixed(1)+'%(freee速報)</div>' : '';
+  // 人件費率・FL率は速報月(給与仕訳未計上)ではpersR/flRがnullになるため、通常チップの代わりに
+  // 「給与処理待ち」である旨を明示するチップを出す(数値を出さない)。
+  const laborBlackoutChip = '<div class="mx-proto-chip">🧪 '+(juneCompany?mxMonthlyLabel(months[juneIdx6]):"")+'は給与処理(毎月10日)後に反映</div>';
+  const persChip = (juneCompany && juneCompany.persR!==null) ? '<div class="mx-proto-chip">🧪 速報: 2026年6月 '+juneCompany.persR.toFixed(1)+'%(freee速報)</div>' : (juneCompany ? laborBlackoutChip : '');
+  const flChip = (juneCompany && juneCompany.flR!==null) ? '<div class="mx-proto-chip">🧪 速報: 2026年6月 '+juneCompany.flR.toFixed(1)+'%(freee速報)</div>' : (juneCompany ? laborBlackoutChip : '');
 
   // ---- 1) 月次売上カード ----
   const salesCard = mxMonthlyCardHtml({
@@ -2874,18 +3205,21 @@ function renderMonthly(){
     listItems: mxMonthlyListRows(selMonth, mxMonthlyCogsRatioVal, false), fmtList: pctFmt1, selStore,
     protoChip: cogsChip, clickMetric:"cogs", note:null
   });
+  const laborBlackoutNote = selMonthIsPrelim
+    ? "給与仕訳は毎月10日の給与処理後にfreeeへ反映されるため、速報月("+mxMonthlyLabel(selMonth)+"度)の人件費率は「–」表示にしています。確定後にご報告します。"
+    : null;
   const persCard = mxMonthlyCardHtml({
     id:"mxMonthlyPersCard", canvasId:"mxMonthlyPersMiniChart", title:"人件費率(全社・目標30%以下)",
     big:curCompany?curCompany.persR:null, prevBig:prevCompany?prevCompany.persR:null, deltaKind:"pt", fmtBig:pctFmt1,
     listItems: mxMonthlyListRows(selMonth, mxMonthlyPersRatioVal, false), fmtList: pctFmt1, selStore,
-    protoChip: persChip, clickMetric:"laborRatio", note:null
+    protoChip: persChip, clickMetric:"laborRatio", note:laborBlackoutNote
   });
   const flCard = mxMonthlyCardHtml({
     id:"mxMonthlyFlCard", canvasId:"mxMonthlyFlMiniChart", title:"FL率(全社・目標60%以下)",
     big:curCompany?curCompany.flR:null, prevBig:prevCompany?prevCompany.flR:null, deltaKind:"pt", fmtBig:pctFmt1,
     listItems: mxMonthlyListRows(selMonth, mxMonthlyFlRatioVal, false), fmtList: pctFmt1, selStore,
     protoChip: flChip, clickMetric:"fl",
-    note: "FL率 = 原価率+人件費率。目標60%以下。"
+    note: "FL率 = 原価率+人件費率。目標60%以下。" + (laborBlackoutNote ? "(" + laborBlackoutNote + ")" : "")
   });
   // ---- 6) 損益ブリッジカード(対象月連動。本部内訳のある月のみ全社利益まで到達) ----
   const bd = mxBridgeData(selMonth);
@@ -2918,6 +3252,7 @@ function renderMonthly(){
     + '<details class="mx-hm-details">'
     + '<summary>店舗別12ヶ月ヒートマップ(原価率/人件費率/FL率)</summary>'
     + mxHeatmapSectionHtml(selStore)
+    + (months.some(m=>mxMonthlyIsPrelim(m)) ? '<div class="mx-note" style="margin-top:8px;">🧪 速報月の人件費率・FL率は「–」表示です。給与仕訳は毎月10日の給与処理後にfreeeへ反映されるため、速報時点では正しい率を計算できません(原価率は仕入連携済みのため表示を継続しています)。確定後にご報告します。</div>' : '')
     + '</details>'
     + '<div class="mx-note" style="margin-top:10px;">水道橋店は業態転換のため2025/12〜2026/4休業/駒沢は2025/11開業。店舗名は駒沢大学店→駒沢パーククォーター店へ名称変更後で統一。本部・本部石野・MARINE SURF CAFE・未選択(共通)は損益ブリッジのみに使用し、上記カード・ヒートマップの集計には含みません。</div>'
     + '<div class="mx-note">2026/4〜5月は消費税の税抜振替処理後の値のため、過去にお渡しした月次レポート(税込)より約8.6%小さく表示されます。</div>';
